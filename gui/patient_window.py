@@ -51,7 +51,7 @@ def add_blood_sugar_ui(hasta_id: int) -> None:
                 ts_str = f"{tarih_str} {saat_str}"
                 olcum_dt = datetime.strptime(ts_str, "%d.%m.%Y %H:%M")
             except ValueError:
-                raise ValueError("Tarih/Saat biçimi GG.AA.YYYY ve HH:MM olmalıdır.")
+                raise ValueError("Tarih/Saat biçimi GG.AA.YYYY ve HH:MM olmalıdır.")
 
             if olcum_dt.date() > date.today():
                 raise ValueError("Gelecekteki bir tarih girilemez.")

@@ -122,6 +122,17 @@ CREATE TABLE IF NOT EXISTS olcum_zamanlari (
     saat_bitis TIME NOT NULL
 );
 
+-- 14. insulin_onerileri
+CREATE TABLE insulin_onerileri (
+    id SERIAL PRIMARY KEY,
+    hasta_id INT NOT NULL REFERENCES kullanicilar(id) ON DELETE CASCADE,
+    tarih DATE NOT NULL,
+    ortalama NUMERIC(5,2) NOT NULL,
+    doz_ml INT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (hasta_id, tarih)
+);
+
 -- Saat aralıklarını ekleyelim
 INSERT INTO olcum_zamanlari (ad, saat_baslangic, saat_bitis) VALUES
 ('Sabah', '07:00', '08:00'),

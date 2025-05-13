@@ -4,19 +4,13 @@ from datetime import datetime
 from core.database import Database
 
 def show(hasta_id: int) -> None:
-    """Hasta için kan şekeri verilerini ve insülin önerisini gösterir."""
-    # ---------- Pencere ----------
     win = tk.Toplevel()
     win.title("Kan Şekeri Verileri ve İnsülin Önerisi")
-    win.geometry("600x500")
+    win.geometry("600x600")
 
-    tk.Label(
-        win,
-        text="Kan Şekeri Verileri ve İnsülin Önerisi",
-        font=("Arial", 14)
-    ).pack(pady=10)
+    tk.Label(win, text="Kan Şekeri Verileri", font=("Arial", 14)).pack(pady=10)
 
-    # ---------- Ölçüm Tablosu ----------
+    # --- Ölçüm Tablosu ---
     columns = ("Tarih", "Saat", "Seviye (mg/dL)")
     tree = ttk.Treeview(win, columns=columns, show="headings", height=10)
     for col, w in zip(columns, (150, 100, 150)):
@@ -24,143 +18,102 @@ def show(hasta_id: int) -> None:
         tree.column(col, width=w, anchor="center")
     tree.pack(pady=10, fill="both", expand=True)
 
-    # ---------- İnsülin Önerisi Alanı ----------
-    insulin_frame = tk.Frame(win)
-    insulin_frame.pack(pady=10, fill="x")
-
-    tk.Label(insulin_frame, text="İnsülin Önerisi:", font=("Arial", 12)).pack()
-    insulin_text = tk.Text(
-        insulin_frame, width=60, height=5, wrap="word", state="disabled"
-    )
-    insulin_text.pack(pady=5)
-
-    # ---------- Verileri Çek ----------
     db = Database()
     db.connect()
-    blood_sugar_logs = db.fetch_all(
-        """
+
+    # Ölçüm verileri
+    logs = db.fetch_all("""
         SELECT olcum_zamani, seviye
         FROM kan_sekeri_olcumleri
         WHERE hasta_id = %s
         ORDER BY olcum_zamani DESC;
-        """,
-        (hasta_id,),
-    )
-    db.close()
-
-    # Ölçümleri bloklara ayır
-    measurements = {
-        "Sabah": None,   # 07:00‑08:59
-        "Öğle":  None,   # 12:00‑13:59
-        "İkindi": None,  # 15:00‑16:59
-        "Akşam": None,   # 18:00‑19:59
-        "Gece":  None,   # 22:00‑23:59
-    }
-
-    for olcum_zamani, seviye in blood_sugar_logs:
-        tarih = olcum_zamani.strftime("%d.%m.%Y")
-        saat  = olcum_zamani.strftime("%H:%M:%S")
-        tree.insert("", "end", values=(tarih, saat, seviye))
-
-        hour = olcum_zamani.hour
-        if 7  <= hour < 9:
-            measurements["Sabah"]  = seviye
-        elif 12 <= hour < 14:
-            measurements["Öğle"]   = seviye
-        elif 15 <= hour < 17:
-            measurements["İkindi"] = seviye
-        elif 18 <= hour < 20:
-            measurements["Akşam"]  = seviye
-        elif 22 <= hour < 24:
-            measurements["Gece"]   = seviye
-
-    # ---------- Ortalama & Doz Hesabı ----------
-    def calculate_insulin_dose() -> None:
-        valid = [v for v in measurements.values() if v is not None]
-
-        insulin_text.config(state="normal")
-        insulin_text.delete("1.0", "end")
-
-        # < 3 ölçüm → güvenilir değil
-        if len(valid) < 3:
-            insulin_text.insert(
-                "1.0",
-                "Yetersiz veri! Ortalama hesaplaması güvenilir değildir."
-            )
-            insulin_text.config(state="disabled")
-            return
-
-        # Eksik ölçüm uyarısı
-        if len(valid) < 5:
-            messagebox.showwarning(
-                "Uyarı",
-                "Ölçüm eksik! Ortalama alınırken bazı ölçümler hesaba katılmadı."
-            )
-
-        avg = sum(valid) / len(valid)
-
-        # İnsülin dozu
-        if   avg < 70:
-            dose = "Yok (Hipoglisemi)"
-        elif avg <= 110:
-            dose = "Yok (Normal)"
-        elif avg <= 150:
-            dose = "1 ml"
-        elif avg <= 200:
-            dose = "2 ml"
-        else:
-            dose = "3 ml"
-
-        insulin_text.insert(
-            "1.0",
-            f"Ortalama Kan Şekeri: {avg:.2f} mg/dL\nİnsülin Önerisi: {dose}"
-        )
-        insulin_text.config(state="disabled")
-
-    # ---------- Hesapla Butonu ----------
-    tk.Button(
-        insulin_frame,
-        text="İnsülin Önerisi Hesapla",
-        command=calculate_insulin_dose
-    ).pack(pady=5)
-
-    win.mainloop()
-
-def view_patient_blood_sugar_logs(hasta_id):
-    """Hasta için kan şekeri verilerini listeleyen arayüz"""
-
-    win = tk.Toplevel()
-    win.title("Kan Şekeri Verileri")
-    win.geometry("600x400")
-
-    # Başlık
-    tk.Label(win, text="Kan Şekeri Verileri", font=("Arial", 14)).pack(pady=10)
-
-    # Kan şekeri verilerini listelemek için Treeview
-    columns = ("Tarih", "Saat", "Seviye (mg/dL)")
-    tree = ttk.Treeview(win, columns=columns, show="headings", height=15)
-
-    for col, width in zip(columns, (150, 100, 150)):
-        tree.heading(col, text=col)
-        tree.column(col, width=width, anchor="center")
-
-    tree.pack(pady=10, fill="both", expand=True)
-
-    # Verileri Veritabanından Çekme
-    db = Database();
-    db.connect()
-    blood_sugar_logs = db.fetch_all("""
-        SELECT olcum_zamani, seviye 
-        FROM kan_sekeri_olcumleri 
-        WHERE hasta_id = %s 
-        ORDER BY olcum_zamani DESC;
     """, (hasta_id,))
-    db.close()
-
-    # Verileri tabloya ekleme
-    for log in blood_sugar_logs:
-        olcum_zamani, seviye = log
+    for olcum_zamani, seviye in logs:
         tarih = olcum_zamani.strftime("%d.%m.%Y")
         saat = olcum_zamani.strftime("%H:%M:%S")
         tree.insert("", "end", values=(tarih, saat, seviye))
 
+    # --- İnsülin Önerileri ---
+    tk.Label(win, text="İnsülin Önerileri", font=("Arial", 14)).pack(pady=10)
+
+    dose_cols = ("Tarih", "Ortalama", "Doz (ml)")
+    dose_tv = ttk.Treeview(win, columns=dose_cols, show="headings", height=6)
+    for col, w in zip(dose_cols, (150, 150, 100)):
+        dose_tv.heading(col, text=col)
+        dose_tv.column(col, width=w, anchor="center")
+    dose_tv.pack(pady=5, fill="x")
+
+    dose_rows = db.get_insulin_suggestions(hasta_id)
+    db.close()
+
+    for tarih, ort, doz in dose_rows:
+        doz_str = "Yetersiz" if doz == -1 else f"{doz} ml"
+        dose_tv.insert("", "end", values=(tarih.strftime("%d.%m.%Y"), f"{ort:.2f}", doz_str))
+
+    def on_dose_double_click(event):
+        selected = dose_tv.selection()
+        if not selected:
+            return
+        item = dose_tv.item(selected[0])
+        tarih_str = item["values"][0]  # "13.05.2025"
+        show_day_details(tarih_str, hasta_id)
+
+    dose_tv.bind("<Double-1>", on_dose_double_click)
+
+    def delete_selected_measurement():
+        selected = tree.selection()
+        if not selected:
+            messagebox.showwarning("Uyarı", "Lütfen silmek için bir ölçüm seçin.")
+            return
+        confirm = messagebox.askyesno("Silme Onayı", "Seçilen ölçümü silmek istiyor musunuz?")
+        if not confirm:
+            return
+
+        item = tree.item(selected[0])
+        tarih_str, saat_str, _ = item["values"]
+        ts = datetime.strptime(f"{tarih_str} {saat_str}", "%d.%m.%Y %H:%M:%S")
+
+        db = Database();
+        db.connect()
+        db.execute_query("""
+            DELETE FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s AND olcum_zamani = %s
+        """, (hasta_id, ts))
+        db.close()
+        tree.delete(selected[0])
+        messagebox.showinfo("Başarılı", "Ölçüm silindi.")
+
+    tk.Button(win, text="Seçili Ölçümü Sil", command=delete_selected_measurement).pack(pady=4)
+
+    win.mainloop()
+
+    def show_day_details(tarih_str, hasta_id):
+        """
+        Belirli bir güne ait saat + seviye detaylarını gösterir.
+        """
+        win = tk.Toplevel()
+        win.title(f"{tarih_str} Ölçüm Detayları")
+        win.geometry("400x400")
+
+        tk.Label(win, text=f"{tarih_str} Günlük Ölçümler", font=("Arial", 14)).pack(pady=10)
+
+        columns = ("Saat", "Seviye (mg/dL)")
+        tree = ttk.Treeview(win, columns=columns, show="headings", height=15)
+        for col, w in zip(columns, (150, 150)):
+            tree.heading(col, text=col)
+            tree.column(col, width=w, anchor="center")
+        tree.pack(pady=10, fill="both", expand=True)
+
+        db = Database()
+        db.connect()
+        rows = db.fetch_all("""
+            SELECT olcum_zamani, seviye
+            FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s AND DATE(olcum_zamani) = %s
+            ORDER BY olcum_zamani;
+        """, (hasta_id, datetime.strptime(tarih_str, "%d.%m.%Y").date()))
+        db.close()
+
+        for olcum_zamani, seviye in rows:
+            saat = olcum_zamani.strftime("%H:%M:%S")
+            tree.insert("", "end", values=(saat, seviye))

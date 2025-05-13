@@ -72,16 +72,6 @@ class Database:
             print(f"Veri çekme hatası: {e}")
             return []
 
-    def create_tables(self):
-        """ schema.sql dosyasındaki sorguları çalıştırır """
-        try:
-            with open("data/schema.sql", "r", encoding="utf-8") as file:
-                schema_sql = file.read()
-
-            self.execute_query(schema_sql)
-        except Exception as e:
-            print(f"Tablolar oluşturulurken hata oluştu: {e}")
-
     def add_user(self, tc_no, ad, soyad, sifre, dogum_tarihi,
                  cinsiyet, email, rol):
 
@@ -321,6 +311,15 @@ class Database:
 
         # Uyarı kontrolü
         self.check_blood_sugar_alert(hasta_id, seviye)
+        self._update_daily_insulin(hasta_id, olcum_zamani.date())
+
+    def get_insulin_suggestions(self, hasta_id):
+        return self.fetch_all("""
+            SELECT tarih, ortalama, doz_ml
+            FROM insulin_onerileri
+            WHERE hasta_id = %s
+            ORDER BY tarih DESC;
+        """, (hasta_id,))
 
     def get_alerts(self, hasta_id):
         """ Hastaya ait uyarıları getirir ve tarih formatını dönüştürür """
@@ -432,18 +431,6 @@ class Database:
             # Bu kayıt kontrol edildi olarak işaretlenir
             checked_records.add(record_key)
 
-    def get_blood_sugar_logs(self, hasta_id):
-        """Bir hastanın kan şekeri ölçümlerini getir."""
-        query = """
-            SELECT kso.id, kso.olcum_zamani, kso.seviye, oz.ad 
-            FROM kan_sekeri_olcumleri kso
-            LEFT JOIN olcum_zamanlari oz ON kso.olcum_zamani_id = oz.id
-            WHERE kso.hasta_id = %s
-            ORDER BY kso.olcum_zamani DESC;
-        """
-        params = (hasta_id,)
-        return self.fetch_all(query, params)
-
     def get_symptom_logs(self, hasta_id):
         """Bir hastanın belirtilerini getir."""
         query = """
@@ -468,62 +455,36 @@ class Database:
         params = (hasta_id,)
         return self.fetch_all(query, params)
 
-    def get_diet_logs(self, hasta_id):
-        """Bir hastanın diyet kayıtlarını getir."""
-        query = """
-            SELECT dt.id, dt.tarih, dt.durum, dtr.ad 
-            FROM diyet_takibi dt
-            LEFT JOIN diyet_turleri dtr ON dt.diyet_turu_id = dtr.id
-            WHERE dt.hasta_id = %s
-            ORDER BY dt.tarih DESC;
-        """
-        params = (hasta_id,)
-        return self.fetch_all(query, params)
+    def _dose_for_avg(self, avg):
+        DOSE_RULES = [
+            (70, 0), (110, 0), (150, 1), (200, 2), (9999, 3)
+        ]
+        for limit, dose in DOSE_RULES:
+            if avg <= limit:
+                return dose
 
-def get_blood_sugar_logs(self, hasta_id):
-    """Bir hastanın kan şekeri ölçümlerini getir."""
-    query = """
-        SELECT kso.id, kso.olcum_zamani, kso.seviye, oz.ad 
-        FROM kan_sekeri_olcumleri kso
-        LEFT JOIN olcum_zamanlari oz ON kso.olcum_zamani_id = oz.id
-        WHERE kso.hasta_id = %s
-        ORDER BY kso.olcum_zamani DESC;
-    """
-    params = (hasta_id,)
-    return self.fetch_all(query, params)
+    def _update_daily_insulin(self, hasta_id: int, the_date):
+        rows = self.fetch_all("""
+            SELECT seviye FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s AND DATE(olcum_zamani) = %s AND olcum_zamani_id IS NOT NULL;
+        """, (hasta_id, the_date))
 
-def get_symptom_logs(self, hasta_id):
-    """Bir hastanın belirtilerini getir."""
-    query = """
-        SELECT hb.id, b.ad, hb.tarih 
-        FROM hasta_belirtileri hb
-        LEFT JOIN belirtiler b ON hb.belirti_id = b.id
-        WHERE hb.hasta_id = %s
-        ORDER BY hb.tarih DESC;
-    """
-    params = (hasta_id,)
-    return self.fetch_all(query, params)
+        if not rows:
+            return
 
-def get_exercise_logs(self, hasta_id):
-    """Bir hastanın egzersiz kayıtlarını getir."""
-    query = """
-        SELECT et.id, et.tarih, et.durum, etr.ad 
-        FROM egzersiz_takibi et
-        LEFT JOIN egzersiz_turleri etr ON et.egzersiz_turu_id = etr.id
-        WHERE et.hasta_id = %s
-        ORDER BY et.tarih DESC;
-    """
-    params = (hasta_id,)
-    return self.fetch_all(query, params)
+        seviyeler = [r[0] for r in rows]
+        if len(seviyeler) < 3:
+            ort, doz = sum(seviyeler) / len(seviyeler), -1
+        else:
+            ort = sum(seviyeler) / len(seviyeler)
+            doz = self._dose_for_avg(ort)
 
-def get_diet_logs(self, hasta_id):
-    """Bir hastanın diyet kayıtlarını getir."""
-    query = """
-        SELECT dt.id, dt.tarih, dt.durum, dtr.ad 
-        FROM diyet_takibi dt
-        LEFT JOIN diyet_turleri dtr ON dt.diyet_turu_id = dtr.id
-        WHERE dt.hasta_id = %s
-        ORDER BY dt.tarih DESC;
-    """
-    params = (hasta_id,)
-    return self.fetch_all(query, params)
+        self.execute_query("""
+            INSERT INTO insulin_onerileri (hasta_id, tarih, ortalama, doz_ml)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (hasta_id, tarih) DO UPDATE
+            SET ortalama = EXCLUDED.ortalama,
+                doz_ml = EXCLUDED.doz_ml,
+                created_at = CURRENT_TIMESTAMP;
+        """, (hasta_id, the_date, ort, doz))
+
