@@ -114,6 +114,23 @@ CREATE TABLE hasta_notlari (
     tarih TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
     not_metni TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS olcum_zamanlari (
+    id SERIAL PRIMARY KEY,
+    ad VARCHAR(20) UNIQUE NOT NULL,
+    saat_baslangic TIME NOT NULL,
+    saat_bitis TIME NOT NULL
+);
+
+-- Saat aralıklarını ekleyelim
+INSERT INTO olcum_zamanlari (ad, saat_baslangic, saat_bitis) VALUES
+('Sabah', '07:00', '08:00'),
+('Öğle', '12:00', '13:00'),
+('İkindi', '15:00', '16:00'),
+('Akşam', '18:00', '19:00'),
+('Gece', '22:00', '23:00');
+
+
 ALTER TABLE uyarilar
 RENAME COLUMN "uyarı_tipi" TO uyari_tipi;
 -- Gerekli uzantıyı yükle (zaten yüklü ama güvence için burada da belirtiyoruz)

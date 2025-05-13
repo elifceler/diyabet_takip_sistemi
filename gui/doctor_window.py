@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
+from core.blood_sugar_ui import show
 
 
 from core.database import Database
@@ -30,6 +31,8 @@ def load_patients(treeview: ttk.Treeview, doctor_id: int):
 
     for r in rows:
         treeview.insert("", "end", iid=r[0], values=r[1:])
+
+
 
 # ------------------------------------------------------------------
 # 2) Doktor Ana Penceresi
@@ -155,5 +158,14 @@ def run_doctor(info: dict):
                 messagebox.showerror("Hata", str(ex))
 
     tk.Button(root, text="Hasta Sil", command=sil).pack(pady=6)
+
+    def view_blood_sugar():
+        sel = tree.selection()
+        if not sel:
+            messagebox.showwarning("Uyarı", "Lütfen bir hasta seçin!")
+            return
+        show(int(sel[0]))
+
+    tk.Button(root, text="Kan Şekeri Verilerini Görüntüle", command=view_blood_sugar).pack(pady=10)
 
     root.mainloop()
