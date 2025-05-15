@@ -21,6 +21,8 @@ def show(hasta_id: int) -> None:
     db = Database()
     db.connect()
 
+    db.check_first_time_measurement_alert(hasta_id)
+
     # Ölçüm verileri
     logs = db.fetch_all("""
         SELECT olcum_zamani, seviye
@@ -73,7 +75,7 @@ def show(hasta_id: int) -> None:
         tarih_str, saat_str, _ = item["values"]
         ts = datetime.strptime(f"{tarih_str} {saat_str}", "%d.%m.%Y %H:%M:%S")
 
-        db = Database();
+        db = Database()
         db.connect()
         db.execute_query("""
             DELETE FROM kan_sekeri_olcumleri
@@ -84,6 +86,27 @@ def show(hasta_id: int) -> None:
         messagebox.showinfo("Başarılı", "Ölçüm silindi.")
 
     tk.Button(win, text="Seçili Ölçümü Sil", command=delete_selected_measurement).pack(pady=4)
+
+    alert_frame = tk.Frame(win)
+    alert_frame.pack(pady=10, fill="x")
+
+    tk.Label(alert_frame, text="Uyarılar", font=("Arial", 12)).pack()
+
+    alert_box = tk.Text(alert_frame, width=70, height=6, wrap="word", state="normal")
+    alert_box.pack(pady=5)
+
+    db = Database()
+    db.connect()
+    alerts = db.get_alerts(hasta_id)
+    db.close()
+
+    if not alerts:
+        alert_box.insert("1.0", "Kayıtlı bir uyarı bulunamadı.")
+    else:
+        for _, tarih, uyari_tipi, mesaj, _ in alerts:
+            alert_box.insert("end", f"{tarih} | {uyari_tipi}: {mesaj}\n")
+
+    alert_box.config(state="disabled")
 
     win.mainloop()
 

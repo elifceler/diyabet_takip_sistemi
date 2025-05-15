@@ -155,3 +155,17 @@ ON CONFLICT (tc_no) DO NOTHING;
 
 SELECT tc_no, ad, sifre FROM kullanicilar WHERE tc_no = '99999999999';
 
+DELETE FROM uyarilar a
+USING uyarilar b
+WHERE a.ctid < b.ctid
+  AND a.hasta_id = b.hasta_id
+  AND a.tarih = b.tarih
+  AND a.uyari_tipi = b.uyari_tipi
+  AND a.mesaj = b.mesaj;
+
+
+ALTER TABLE uyarilar
+ADD CONSTRAINT uyarilar_unique
+UNIQUE (hasta_id, tarih, uyari_tipi, mesaj);
+
+ALTER TABLE uyarilar ADD COLUMN gosterildi BOOLEAN DEFAULT FALSE;

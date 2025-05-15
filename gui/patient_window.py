@@ -53,9 +53,6 @@ def add_blood_sugar_ui(hasta_id: int) -> None:
             except ValueError:
                 raise ValueError("Tarih/Saat biçimi GG.AA.YYYY ve HH:MM olmalıdır.")
 
-            if olcum_dt.date() > date.today():
-                raise ValueError("Gelecekteki bir tarih girilemez.")
-
             # ---- otomatik ÖLÇÜM_ZAMANI belirleme
             db = Database(); db.connect()
             zaman_kayitlari = db.fetch_all(
@@ -71,8 +68,20 @@ def add_blood_sugar_ui(hasta_id: int) -> None:
                     zaman_id = z_id
                     break
 
+            # Aynı gün ve aynı zaman aralığında ölçüm var mı kontrolü
+            if zaman_id is not None:
+                var_mi = db.fetch_one("""
+                    SELECT id FROM kan_sekeri_olcumleri
+                    WHERE hasta_id = %s AND DATE(olcum_zamani) = %s AND olcum_zamani_id = %s
+                """, (hasta_id, olcum_dt.date(), zaman_id))
+
+                if var_mi:
+                    db.close()
+                    messagebox.showerror("Hata", "Bu zaman aralığına ait bir ölçüm zaten mevcut.")
+                    return
+
             if zaman_id is None:
-                # Saat aralığı dışı: kaydet → ortalamaya katılmasın
+                # Saat aralığı dışı: kaydet → ortalamaya katılmasın
                 ortalama_dahil = False
                 # ‑1 gibi kurgusal zaman_id kullanabiliriz ya da NULL bırakabiliriz.
                 # Ben NULL bırakacağım (veritabanı sütunu NULL kabul ediyor).
@@ -89,6 +98,8 @@ def add_blood_sugar_ui(hasta_id: int) -> None:
                 zaman_id,               # bulunabildiyse id, yoksa None
                 seviye                  # seviye
             )
+
+            db.check_insulin_data_alert(hasta_id, olcum_dt.date())
             db.close()
 
             messagebox.showinfo("Başarılı", "Kan şekeri kaydedildi.")
@@ -100,6 +111,7 @@ def add_blood_sugar_ui(hasta_id: int) -> None:
             messagebox.showerror("Hata", f"Bir hata oluştu: {ex}")
 
     tk.Button(win, text="Kaydet", command=kaydet).pack(pady=14)
+
     win.mainloop()
 
 # ------------------------------------------------------------------

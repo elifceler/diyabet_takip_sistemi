@@ -1,7 +1,7 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from datetime import datetime
 from core.blood_sugar_ui import show
+from datetime import date
 
 
 from core.database import Database
@@ -167,5 +167,43 @@ def run_doctor(info: dict):
         show(int(sel[0]))
 
     tk.Button(root, text="Kan Şekeri Verilerini Görüntüle", command=view_blood_sugar).pack(pady=10)
+
+    def view_alerts():
+        sel = tree.selection()
+        if not sel:
+            messagebox.showwarning("Uyarı", "Lütfen bir hasta seçin!")
+            return
+
+        hasta_id = int(sel[0])
+
+        db = Database()
+        db.connect()
+        db.generate_all_doctor_alerts(hasta_id)
+        db.check_first_time_measurement_alert(hasta_id)
+        alerts = db.get_doctor_alerts(hasta_id)
+        db.close()
+
+        alert_win = tk.Toplevel()
+        alert_win.title("Uyarılar")
+        alert_win.geometry("600x400")
+
+        tk.Label(alert_win, text="Hastaya Ait Doktor Uyarıları", font=("Arial", 14)).pack(pady=10)
+
+        alert_box = tk.Text(alert_win, width=80, height=20, wrap="word", state="normal")
+        alert_box.pack(padx=10, pady=10, fill="both", expand=True)
+
+        if not alerts:
+            alert_box.insert("1.0", "Bu hastaya ait kayıtlı uyarı bulunamadı.")
+        else:
+            for _, tarih, tipi, mesaj, _ in alerts:
+                if isinstance(tarih, str):
+                    tarih_str = tarih
+                else:
+                    tarih_str = tarih.strftime("%d.%m.%Y")
+                alert_box.insert("end", f"{tarih_str} | {tipi}: {mesaj}\n")
+
+        alert_box.config(state="disabled")
+
+    tk.Button(root, text="Uyarıları Görüntüle", command=view_alerts).pack(pady=6)
 
     root.mainloop()

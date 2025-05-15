@@ -312,6 +312,7 @@ class Database:
         # Uyarı kontrolü
         self.check_blood_sugar_alert(hasta_id, seviye)
         self._update_daily_insulin(hasta_id, olcum_zamani.date())
+        self.check_insulin_data_alert(hasta_id, olcum_zamani.date())
 
     def get_insulin_suggestions(self, hasta_id):
         return self.fetch_all("""
@@ -322,21 +323,30 @@ class Database:
         """, (hasta_id,))
 
     def get_alerts(self, hasta_id):
-        """ Hastaya ait uyarıları getirir ve tarih formatını dönüştürür """
+        """Hastaya ait bildirilmeyen uyarıları getir ve gösterildikten sonra işaretle."""
         query = """
-            SELECT id, tarih, uyari_tipi, mesaj, bildirildi 
-            FROM public.uyarilar 
-            WHERE hasta_id = %s 
+            SELECT id, tarih, uyari_tipi, mesaj, bildirildi
+            FROM public.uyarilar
+            WHERE hasta_id = %s AND bildirildi = FALSE
             ORDER BY tarih DESC;
         """
         params = (hasta_id,)
         alerts = self.fetch_all(query, params)
 
+        # Bildirildi olarak işaretle (bir daha gösterilmemesi için)
+        for alert in alerts:
+            alert_id = alert[0]
+            self.execute_query("""
+                UPDATE public.uyarilar
+                SET bildirildi = TRUE
+                WHERE id = %s;
+            """, (alert_id,))
+
         # Tarih formatını dönüştür
         formatted_alerts = []
         for alert in alerts:
             alert_id, tarih, uyari_tipi, mesaj, bildirildi = alert
-            formatted_tarih = tarih.strftime("%d.%m.%Y %H:%M:%S")
+            formatted_tarih = tarih.strftime("%d.%m.%Y")
             formatted_alerts.append((alert_id, formatted_tarih, uyari_tipi, mesaj, bildirildi))
 
         return formatted_alerts
@@ -456,10 +466,10 @@ class Database:
         return self.fetch_all(query, params)
 
     def _dose_for_avg(self, avg):
-        DOSE_RULES = [
+        dose_rules = [
             (70, 0), (110, 0), (150, 1), (200, 2), (9999, 3)
         ]
-        for limit, dose in DOSE_RULES:
+        for limit, dose in dose_rules:
             if avg <= limit:
                 return dose
 
@@ -474,7 +484,8 @@ class Database:
 
         seviyeler = [r[0] for r in rows]
         if len(seviyeler) < 3:
-            ort, doz = sum(seviyeler) / len(seviyeler), -1
+            ort = sum(seviyeler) / len(seviyeler)
+            doz = self._dose_for_avg(ort)  # Öneriyi yine de ver
         else:
             ort = sum(seviyeler) / len(seviyeler)
             doz = self._dose_for_avg(ort)
@@ -488,3 +499,152 @@ class Database:
                 created_at = CURRENT_TIMESTAMP;
         """, (hasta_id, the_date, ort, doz))
 
+    def check_insulin_data_alert(self, hasta_id: int, the_date):
+        """
+        Belirli bir tarihteki ölçümleri kontrol eder ve eksik/yetersizse uyarı ekler.
+        """
+        # Aynı güne ait önceki insulin uyarılarını sil
+        self.execute_query("""
+            DELETE FROM uyarilar
+            WHERE hasta_id = %s AND DATE(tarih) = %s AND uyari_tipi IN ('Eksik Ölçüm', 'Yetersiz Ölçüm');
+        """, (hasta_id, the_date))
+
+        rows = self.fetch_all("""
+            SELECT seviye, olcum_zamani_id
+            FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s AND DATE(olcum_zamani) = %s;
+        """, (hasta_id, the_date))
+
+        seviyeler = [r[0] for r in rows if r[1] is not None]
+        eksik_miktar = 5 - len(seviyeler)
+
+        if len(seviyeler) < 3:
+            # Yetersiz veri
+            mesaj1 = f"{the_date.strftime('%d.%m.%Y')} tarihli ölçümler yetersiz! Ortalama güvenilir değil."
+            self._add_insulin_alert_once(hasta_id, the_date, "Yetersiz Ölçüm", mesaj1)
+
+            # Aynı zamanda eksik ölçüm uyarısı da verilmeli
+            eksik_miktar = 5 - len(seviyeler)
+            mesaj2 = f"{the_date.strftime('%d.%m.%Y')} tarihinde {eksik_miktar} ölçüm eksik. Ortalama eksik verilere göre hesaplandı."
+            self._add_insulin_alert_once(hasta_id, the_date, "Eksik Ölçüm", mesaj2)
+
+
+        elif eksik_miktar > 0:
+            mesaj = "Ölçüm eksik! Ortalama alınırken bu ölçüm hesaba katılmadı."
+            self._add_insulin_alert_once(hasta_id, the_date, "Eksik Ölçüm", mesaj)
+
+    def _add_insulin_alert_once(self, hasta_id, tarih, tip, mesaj):
+        """
+        Aynı tarih ve aynı mesaj için tekrar tekrar uyarı eklemeyi önler.
+        """
+        var_mi = self.fetch_one("""
+            SELECT id FROM uyarilar
+            WHERE hasta_id = %s AND tarih = %s AND uyari_tipi = %s AND mesaj = %s;
+        """, (hasta_id, tarih, tip, mesaj))
+
+        if not var_mi:
+            self.add_alert(hasta_id, tarih, tip, mesaj)
+
+    def check_daily_blood_sugar_alerts_for_doctor(self, hasta_id: int, date_obj):
+        """Her ölçüm sonrası çalışır, o güne dair tüm verileri analiz edip uyarı ekler"""
+        rows = self.fetch_all("""
+            SELECT seviye, olcum_zamani
+            FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s AND DATE(olcum_zamani) = %s
+        """, (hasta_id, date_obj))
+
+        seviyeler = [r[0] for r in rows]
+
+        # 1. Hiç ölçüm yoksa
+        if not seviyeler:
+            self.add_alert(
+                hasta_id, date_obj,
+                "Ölçüm Eksik Uyarısı",
+                "Hasta gün boyunca kan şekeri ölçümü yapmamıştır. Acil takip önerilir."
+            )
+            return
+
+        # 2. Ölçüm sayısı < 3
+        if len(seviyeler) < 3:
+            self.add_alert(
+                hasta_id, date_obj,
+                "Ölçüm Yetersiz Uyarısı",
+                "Hastanın günlük kan şekeri ölçüm sayısı yetersiz (<3). Durum izlenmelidir."
+            )
+
+        # 3. Ölçüm seviyelerine göre detaylı doktor uyarıları
+        for seviye in seviyeler:
+            if seviye < 70:
+                self.add_alert(
+                    hasta_id, date_obj,
+                    "Acil Uyarı",
+                    "Hastanın kan şekeri seviyesi 70 mg/dL'nin altına düştü. Hipoglisemi riski! Hızlı müdahale gerekebilir."
+                )
+            elif 111 <= seviye <= 150:
+                self.add_alert(
+                    hasta_id, date_obj,
+                    "Takip Uyarısı",
+                    "Hastanın kan şekeri 111-150 mg/dL arasında. Durum izlenmeli."
+                )
+            elif 151 <= seviye <= 200:
+                self.add_alert(
+                    hasta_id, date_obj,
+                    "İzleme Uyarısı",
+                    "Hastanın kan şekeri 151-200 mg/dL arasında. Diyabet kontrolü gereklidir."
+                )
+            elif seviye > 200:
+                self.add_alert(
+                    hasta_id, date_obj,
+                    "Acil Müdahale Uyarısı",
+                    "Hastanın kan şekeri 200 mg/dL'nin üzerinde. Hiperglisemi durumu. Acil müdahale gerekebilir."
+                )
+
+    def check_first_time_measurement_alert(self, hasta_id: int):
+        """Hasta daha önce hiç ölçüm yapmadıysa genel bir uyarı oluşturur."""
+        count = self.fetch_one("""
+            SELECT COUNT(*) FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s
+        """, (hasta_id,))
+
+        if count and count[0] == 0:
+            mesaj = "Hasta henüz hiç kan şekeri ölçümü yapmamıştır. Takip önerilir."
+            self.add_alert(hasta_id, datetime.today().date(), "İlk Ölçüm Eksik", mesaj)
+
+    def get_doctor_alerts(self, hasta_id):
+        """
+        Doktora gösterilecek uyarıları döndürür.
+        Sadece doktor tipi uyarılar: 'Acil Uyarı', 'Takip Uyarısı', 'İzleme Uyarısı',
+        'Acil Müdahale Uyarısı', 'Ölçüm Eksik Uyarısı', 'Ölçüm Yetersiz Uyarısı'
+        """
+        query = """
+            SELECT id, tarih, uyari_tipi, mesaj, bildirildi
+            FROM public.uyarilar
+            WHERE hasta_id = %s
+            AND uyari_tipi IN (
+                'Acil Uyarı',
+                'Takip Uyarısı',
+                'İzleme Uyarısı',
+                'Acil Müdahale Uyarısı',
+                'Ölçüm Eksik Uyarısı',
+                'Ölçüm Yetersiz Uyarısı'
+            )
+            AND bildirildi = FALSE
+            ORDER BY tarih DESC;
+        """
+        alerts = self.fetch_all(query, (hasta_id,))
+
+        for alert in alerts:
+            self.execute_query("UPDATE public.uyarilar SET bildirildi = TRUE WHERE id = %s", (alert[0],))
+
+        return alerts
+
+    def generate_all_doctor_alerts(self, hasta_id: int):
+        # Hastanın ölçüm yaptığı bütün tarihleri çek
+        dates = self.fetch_all("""
+            SELECT DISTINCT DATE(olcum_zamani)
+            FROM kan_sekeri_olcumleri
+            WHERE hasta_id = %s;
+        """, (hasta_id,))
+
+        for (d,) in dates:
+            self.check_daily_blood_sugar_alerts_for_doctor(hasta_id, d)
