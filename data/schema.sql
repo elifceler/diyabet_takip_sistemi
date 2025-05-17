@@ -143,7 +143,7 @@ INSERT INTO olcum_zamanlari (ad, saat_baslangic, saat_bitis) VALUES
 
 
 ALTER TABLE uyarilar
-RENAME COLUMN "uyarı_tipi" TO uyari_tipi;
+RENAME COLUMN "uyari_tipi" TO uyari_tipi;
 -- Gerekli uzantıyı yükle (zaten yüklü ama güvence için burada da belirtiyoruz)
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
@@ -169,3 +169,97 @@ ADD CONSTRAINT uyarilar_unique
 UNIQUE (hasta_id, tarih, uyari_tipi, mesaj);
 
 ALTER TABLE uyarilar ADD COLUMN gosterildi BOOLEAN DEFAULT FALSE;
+
+INSERT INTO kullanicilar (
+    tc_no, ad, soyad, sifre, dogum_tarihi, cinsiyet, email, rol
+) VALUES (
+    '77777777777',
+    'Ali',
+    'Veli',
+    decode(encode(digest('456', 'sha256'), 'hex'), 'hex'),
+    '1990-01-01',
+    'Erkek',
+    'ali.veli@example.com',
+    'hasta'
+);
+
+INSERT INTO kullanicilar (
+    tc_no, ad, soyad, sifre, dogum_tarihi, cinsiyet, email, rol
+) VALUES (
+    '666666666666',
+    'Mehmet',
+    'Işık',
+    decode(encode(digest('456', 'sha256'), 'hex'), 'hex'),
+    '1995-05-01',
+    'Erkek',
+    'mehmet_isik@example.com',
+    'hasta'
+);
+
+
+
+INSERT INTO kullanicilar
+(tc_no, ad, soyad, sifre, dogum_tarihi, cinsiyet, email, rol)
+VALUES
+('88888888888', 'Ayşe', 'Demir', digest('234', 'sha256'), '1995-06-12', 'Kadın', 'ayse@example.com', 'hasta');
+
+INSERT INTO kullanicilar
+(tc_no, ad, soyad, sifre, dogum_tarihi, cinsiyet, email, rol)
+VALUES
+('66666666666', 'Furkan', 'Yıldız', digest('135', 'sha256'), '2000-04-17', 'Erkek', 'furkanyildiz@example.com', 'hasta');
+
+
+INSERT INTO kullanicilar (tc_no, ad, soyad, sifre, dogum_tarihi, cinsiyet, email, rol)
+VALUES (
+    '99999999991',                     -- TC
+    'Ahmet',                           -- Ad
+    'Yılmaz',                          -- Soyad
+    digest('d234', 'sha256'),     -- Şifre (şifreli)
+    '1980-05-10',                      -- Doğum Tarihi
+    'Erkek',                           -- Cinsiyet
+    'ahmet.yilmaz@example.com',       -- E-posta
+    'doktor'                          -- Rol
+);
+
+INSERT INTO kullanicilar
+(tc_no, ad, soyad, sifre, dogum_tarihi, cinsiyet, email, rol)
+VALUES
+('88888888881', 'Yavuz', 'Bilgin', digest('178', 'sha256'), '2001-02-04', 'Erkek', 'yavuz@example.com', 'hasta');
+
+
+
+DROP TABLE IF EXISTS public.diyet_takibi CASCADE;
+
+DROP TABLE IF EXISTS public.egzersiz_takibi CASCADE;
+
+-- Diyet takibi tablosuna
+ALTER TABLE diyet_takibi
+ADD COLUMN hasta_ad TEXT,
+ADD COLUMN hasta_tc VARCHAR(11);
+
+-- Egzersiz takibi tablosuna
+ALTER TABLE egzersiz_takibi
+ADD COLUMN hasta_ad TEXT,
+ADD COLUMN hasta_tc VARCHAR(11);
+
+CREATE TABLE diyet_takibi (
+    id SERIAL PRIMARY KEY,
+    hasta_id INTEGER REFERENCES kullanicilar(id),
+    tarih DATE NOT NULL,
+    saat TIME NOT NULL,
+    durum BOOLEAN DEFAULT TRUE,
+    diyet_turu_id INTEGER REFERENCES diyet_turleri(id),
+    hasta_ad TEXT,
+    hasta_tc VARCHAR(11)
+);
+
+CREATE TABLE egzersiz_takibi (
+    id SERIAL PRIMARY KEY,
+    hasta_id INTEGER REFERENCES kullanicilar(id),
+    tarih DATE NOT NULL,
+    saat TIME NOT NULL,
+    durum BOOLEAN DEFAULT TRUE,
+    egzersiz_turu_id INTEGER REFERENCES egzersiz_turleri(id),
+    hasta_ad TEXT,
+    hasta_tc VARCHAR(11)
+);

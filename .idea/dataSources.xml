@@ -1,11 +1,11 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="DataSourceManagerImpl" format="xml" multifile-model="true">
-    <data-source source="LOCAL" name="diyabet_db@localhost" uuid="3094e13a-3f6b-46ef-b610-9f21a4132cd0">
+    <data-source source="LOCAL" name="diyabet_sistemi@localhost" uuid="c7499bf5-c45d-41a6-89ce-35af12e435ba">
       <driver-ref>postgresql</driver-ref>
       <synchronize>true</synchronize>
       <jdbc-driver>org.postgresql.Driver</jdbc-driver>
-      <jdbc-url>jdbc:postgresql://localhost:5432/diyabet_db</jdbc-url>
+      <jdbc-url>jdbc:postgresql://localhost:5432/diyabet_sistemi</jdbc-url>
       <working-dir>$ProjectFileDir$</working-dir>
     </data-source>
   </component>
