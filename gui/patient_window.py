@@ -1,12 +1,13 @@
 # gui/patient_window.py
 import tkinter as tk
-from tkinter import ttk, messagebox
-from datetime import datetime, date
+from tkinter import messagebox
+from datetime import datetime
 from core.database import Database
 from core.blood_sugar_ui import show   # ölçüm‑liste & insülin penceresi
 from gui.onerileri_uygula_window import open_pending_recommendations
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+
 
 # ------------------------------------------------------------------
 # 1) ÖLÇÜM EKLEME PENCERESİ
@@ -155,6 +156,12 @@ def run_patient(info: dict) -> None:
         command=lambda: show_blood_sugar_graph(info["id"])
     ).pack(pady=4)
 
+    tk.Button(
+        root, text="Geri Dön",
+        command=lambda: back_to_login(root)
+    ).pack(pady=10)
+
+
     root.mainloop()
 
 def show_progress(hasta_id: int):
@@ -223,3 +230,7 @@ def show_blood_sugar_graph(hasta_id: int):
 
     tk.Button(win, text="Kapat", command=win.destroy).pack(pady=6)
 
+def back_to_login(window):
+    window.destroy()  # Hasta panelini kapat
+    from main import run_entry  # Giriş ekranını yeniden başlat
+    run_entry()

@@ -12,7 +12,9 @@ from core.blood_sugar_ui import show                         # kan şekeri geçm
 from core.recommendation_window import open_recommendation_window  # diyet/egzersiz önerisi
 from core.gecmis_oneriler_window import open_gecmis_oneriler_window
 from gui.patient_window import show_progress
-from core.graph_utils import show_combined_graph  # EN ÜSTE import bloğuna ekle
+from core.graph_utils import show_combined_graph
+
+
 
 # ------------------------------------------------------------------
 # HASTA LİSTESİNİ YENİDEN YÜKLE
@@ -59,7 +61,7 @@ def run_doctor(info: dict) -> None:
     """
     root = tk.Tk()
     root.title("Doktor Paneli")
-    root.geometry("880x760")
+    root.geometry("880x850")
     root.resizable(False, False)
 
     # ------------------ BAŞLIK ------------------
@@ -140,7 +142,14 @@ def run_doctor(info: dict) -> None:
             # ---- veritabanına ekle
             add_patient(info["id"], tc, ad, soyad, password, email, dob, cinsiyet)
             load_patients(tree, info["id"])
-            messagebox.showinfo("Başarılı", f"{ad} {soyad} eklendi.")
+
+            # ---- E-POSTA GÖNDER
+            from core.email_utils import send_login_email
+            try:
+                send_login_email(email, password, tc)
+                messagebox.showinfo("Bilgi", "Hasta eklendi ve şifre e-posta adresine gönderildi.")
+            except Exception as e:
+                messagebox.showwarning("E-posta Hatası", f"Hasta kaydedildi ancak e-posta gönderilemedi.\n{e}")
 
             # formu temizle
             for w in entries.values():
@@ -337,5 +346,17 @@ def run_doctor(info: dict) -> None:
         fg="white"
     ).pack(pady=4)
 
+    tk.Button(
+        root,
+        text="Geri Dön",
+        command=lambda: back_to_login(root),
+        bg="black",
+        fg="white"
+    ).pack(pady=10)
+
     root.mainloop()
 
+def back_to_login(window):
+    window.destroy()
+    from main import run_entry
+    run_entry()
