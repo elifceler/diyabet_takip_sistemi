@@ -612,7 +612,7 @@ class Database:
 
     def get_doctor_alerts(self, hasta_id):
         """
-        Doktora gösterilecek uyarıları döndürür.
+        Doktora gösterilecek TÜM uyarıları döndürür.
         Sadece doktor tipi uyarılar: 'Acil Uyarı', 'Takip Uyarısı', 'İzleme Uyarısı',
         'Acil Müdahale Uyarısı', 'Ölçüm Eksik Uyarısı', 'Ölçüm Yetersiz Uyarısı'
         """
@@ -628,15 +628,9 @@ class Database:
                 'Ölçüm Eksik Uyarısı',
                 'Ölçüm Yetersiz Uyarısı'
             )
-            AND bildirildi = FALSE
             ORDER BY tarih DESC;
         """
-        alerts = self.fetch_all(query, (hasta_id,))
-
-        for alert in alerts:
-            self.execute_query("UPDATE public.uyarilar SET bildirildi = TRUE WHERE id = %s", (alert[0],))
-
-        return alerts
+        return self.fetch_all(query, (hasta_id,))
 
     def generate_all_doctor_alerts(self, hasta_id: int):
         # Hastanın ölçüm yaptığı bütün tarihleri çek
