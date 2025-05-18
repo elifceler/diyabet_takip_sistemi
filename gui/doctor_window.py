@@ -1,8 +1,9 @@
 # gui/doctor_window.py
 import tkinter as tk
 from tkinter import ttk, messagebox
-from datetime import date            # şimdilik yalnızca future-proof için
-                                      # (view_alerts içinde tarih formatı gerekirse)
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+import matplotlib.pyplot as plt
+
 
 from core.database import Database
 from core.user_management import add_patient, delete_patient
@@ -10,6 +11,8 @@ from core.validators import validate_tc, validate_email, validate_date
 from core.blood_sugar_ui import show                         # kan şekeri geçmişi
 from core.recommendation_window import open_recommendation_window  # diyet/egzersiz önerisi
 from core.gecmis_oneriler_window import open_gecmis_oneriler_window
+from gui.patient_window import show_progress
+from core.graph_utils import show_combined_graph  # EN ÜSTE import bloğuna ekle
 
 # ------------------------------------------------------------------
 # HASTA LİSTESİNİ YENİDEN YÜKLE
@@ -56,7 +59,7 @@ def run_doctor(info: dict) -> None:
     """
     root = tk.Tk()
     root.title("Doktor Paneli")
-    root.geometry("780x660")
+    root.geometry("880x760")
     root.resizable(False, False)
 
     # ------------------ BAŞLIK ------------------
@@ -252,7 +255,87 @@ def run_doctor(info: dict) -> None:
         fg="white"
     ).pack(pady=4)  # <—  pack çağrısı doğrudan run_doctor içindeyse görünür
 
+    def view_progress_for_selected_patient():
+        sel = tree.selection()
+        if not sel:
+            messagebox.showwarning("Uyarı", "Lütfen bir hasta seçin.")
+            return
+        hasta_id = int(sel[0])
+        show_progress(hasta_id)  # hasta arayüzündeki aynı fonksiyon kullanılabilir
+
+    tk.Button(
+        root,
+        text="Öneri Uygulama Durumu",
+        command=view_progress_for_selected_patient,
+        bg="#FFC107",
+        fg="black"
+    ).pack(pady=4)
 
 
+    def view_adherence_graph():
+        sel = tree.selection()
+        if not sel:
+            messagebox.showwarning("Uyarı", "Lütfen bir hasta seçin!")
+            return
+        show_patient_adherence_graph(int(sel[0]))
+
+    tk.Button(
+        root,
+        text="Uygulama Oranı Grafiği",
+        command=view_adherence_graph,
+        bg="#8E44AD", fg="white"
+    ).pack(pady=4)
+
+    def show_patient_adherence_graph(hasta_id: int):
+        db = Database()
+        db.connect()
+
+        # Diyet verileri
+        total_diet = db.fetch_one("SELECT COUNT(*) FROM diyet_takibi WHERE hasta_id = %s", (hasta_id,))[0]
+        done_diet = db.fetch_one("SELECT COUNT(*) FROM diyet_takibi WHERE hasta_id = %s AND durum = TRUE", (hasta_id,))[
+            0]
+        diet_percent = round((done_diet / total_diet) * 100, 2) if total_diet > 0 else 0
+
+        # Egzersiz verileri
+        total_ex = db.fetch_one("SELECT COUNT(*) FROM egzersiz_takibi WHERE hasta_id = %s", (hasta_id,))[0]
+        done_ex = \
+        db.fetch_one("SELECT COUNT(*) FROM egzersiz_takibi WHERE hasta_id = %s AND durum = TRUE", (hasta_id,))[0]
+        ex_percent = round((done_ex / total_ex) * 100, 2) if total_ex > 0 else 0
+
+        db.close()
+
+        # Grafik penceresi
+        win = tk.Toplevel()
+        win.title("Uygulama Oranı")
+        win.geometry("600x400")
+
+        fig, ax = plt.subplots(figsize=(6, 4))
+        ax.bar(["Diyet", "Egzersiz"], [diet_percent, ex_percent], color=["#4CAF50", "#2196F3"])
+        ax.set_ylim(0, 100)
+        ax.set_ylabel("Uygulanma Oranı (%)")
+        ax.set_title("Diyet ve Egzersiz Önerilerinin Uygulanma Oranı")
+        for i, val in enumerate([diet_percent, ex_percent]):
+            ax.text(i, val + 2, f"{val}%", ha='center', fontweight="bold")
+        fig.tight_layout()
+
+        canvas = FigureCanvasTkAgg(fig, master=win)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def view_relationship_graph():
+        sel = tree.selection()
+        if not sel:
+            messagebox.showwarning("Uyarı", "Lütfen bir hasta seçin!")
+            return
+        show_combined_graph(int(sel[0]))
+
+    tk.Button(
+        root,
+        text="Kan Şekeri İlişki Grafiği",
+        command=view_relationship_graph,
+        bg="#03A9F4",
+        fg="white"
+    ).pack(pady=4)
 
     root.mainloop()
+

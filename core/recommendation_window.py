@@ -23,6 +23,12 @@ def open_recommendation_window(hasta_id: int) -> None:
     sugar_entry = tk.Entry(win, width=12, justify="center")
     sugar_entry.pack()
 
+    # --- Tarih girişi ---
+    tk.Label(win, text="Tarih (GG.AA.YYYY)", font=("Arial", 12, "bold")).pack(pady=(16, 4))
+    date_entry = tk.Entry(win, width=20, justify="center")
+    date_entry.insert(0, datetime.now().strftime("%d.%m.%Y"))
+    date_entry.pack()
+
     # ----------------- Belirtiler listesi -----------------
     tk.Label(
         win, text="Belirtiler", font=("Arial", 12, "bold")
@@ -82,9 +88,13 @@ def open_recommendation_window(hasta_id: int) -> None:
         diet, exercise = get_recommendations(sugar, selected_symptoms)
 
         # -- Zaman damgası
-        now = datetime.now()
-        tarih_str = now.date()         # YYYY-MM-DD (DATE)
-        saat_str  = now.time()         # HH:MM:SS (TIME)
+        try:
+            tarih_str = datetime.strptime(date_entry.get().strip(), "%d.%m.%Y").date()
+        except ValueError:
+            messagebox.showerror("Hata", "Tarih formatı GG.AA.YYYY olmalı.")
+            return
+
+        saat_str = datetime.now().time()
 
         db = Database(); db.connect()
 
@@ -107,7 +117,8 @@ def open_recommendation_window(hasta_id: int) -> None:
             VALUES (%s, %s)
             ON CONFLICT (ad) DO NOTHING;
             """,
-            (diet, f"Otomatik öneri {now:%d.%m.%Y}")
+            (diet, f"Otomatik öneri {tarih_str.strftime('%d.%m.%Y')}")
+
         )
 
         db.execute_query(
@@ -116,7 +127,7 @@ def open_recommendation_window(hasta_id: int) -> None:
             VALUES (%s, %s)
             ON CONFLICT (ad) DO NOTHING;
             """,
-            (exercise, f"Otomatik öneri {now:%d.%m.%Y}")
+            (exercise, f"Otomatik öneri {tarih_str.strftime('%d.%m.%Y')}")
         )
 
         # Tür ID’lerini çek
@@ -133,7 +144,7 @@ def open_recommendation_window(hasta_id: int) -> None:
             INSERT INTO diyet_takibi
             (hasta_id, tarih, saat, durum, diyet_turu_id,
              hasta_ad, hasta_tc)
-            VALUES (%s, %s, %s, TRUE, %s, %s, %s);
+            VALUES (%s, %s, %s, FALSE, %s, %s, %s);
             """,
             (hasta_id, tarih_str, saat_str, diet_id, tam_ad, hasta_tc)
         )
@@ -143,7 +154,7 @@ def open_recommendation_window(hasta_id: int) -> None:
             INSERT INTO egzersiz_takibi
             (hasta_id, tarih, saat, durum, egzersiz_turu_id,
              hasta_ad, hasta_tc)
-            VALUES (%s, %s, %s, TRUE, %s, %s, %s);
+            VALUES (%s, %s, %s, FALSE, %s, %s, %s);
             """,
             (hasta_id, tarih_str, saat_str, ex_id, tam_ad, hasta_tc)
         )

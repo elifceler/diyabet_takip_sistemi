@@ -4,6 +4,9 @@ from tkinter import ttk, messagebox
 from datetime import datetime, date
 from core.database import Database
 from core.blood_sugar_ui import show   # ölçüm‑liste & insülin penceresi
+from gui.onerileri_uygula_window import open_pending_recommendations
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 
 # ------------------------------------------------------------------
 # 1) ÖLÇÜM EKLEME PENCERESİ
@@ -137,4 +140,86 @@ def run_patient(info: dict) -> None:
         command=lambda: show(info["id"])          # blood_sugar_ui.show()
     ).pack(pady=4)
 
+    tk.Button(
+        root, text="Diyet / Egzersiz Önerilerini Uygula",
+        command=lambda: open_pending_recommendations(info["id"])
+    ).pack(pady=4)
+
+    tk.Button(
+        root, text="Öneri Uygulama Durumu",
+        command=lambda: show_progress(info["id"])
+    ).pack(pady=4)
+
+    tk.Button(
+        root, text="Kan Şekeri Grafiğini Göster",
+        command=lambda: show_blood_sugar_graph(info["id"])
+    ).pack(pady=4)
+
     root.mainloop()
+
+def show_progress(hasta_id: int):
+    import matplotlib.pyplot as plt
+    from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+    import tkinter as tk
+    from core.database import Database
+
+    db = Database()
+    db.connect()
+    diyet_oran, egzersiz_oran = db.get_recommendation_progress(hasta_id)
+    db.close()
+
+    win = tk.Toplevel()
+    win.title("Öneri Uygulama Yüzdesi")
+    win.geometry("500x400")
+    win.resizable(False, False)
+
+    fig, ax = plt.subplots(figsize=(5, 3.5))
+    kategoriler = ['Diyet', 'Egzersiz']
+    oranlar = [diyet_oran, egzersiz_oran]
+    colors = ['#4CAF50', '#2196F3']
+
+    bars = ax.bar(kategoriler, oranlar, color=colors)
+    ax.set_ylim(0, 100)
+    ax.set_ylabel("Uygulama Oranı (%)")
+    ax.set_title("Diyet ve Egzersiz Uygulama Yüzdesi")
+
+    for bar, oran in zip(bars, oranlar):
+        height = bar.get_height()
+        ax.text(bar.get_x() + bar.get_width() / 2.0, height + 3, f"{oran:.0f}%", ha='center', va='bottom', fontsize=10)
+
+    canvas = FigureCanvasTkAgg(fig, master=win)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    tk.Button(win, text="Kapat", command=win.destroy).pack(pady=6)
+
+def show_blood_sugar_graph(hasta_id: int):
+    db = Database()
+    db.connect()
+    data = db.get_insulin_averages_for_graph(hasta_id)
+    db.close()
+
+    if not data:
+        messagebox.showinfo("Bilgi", "Gösterilecek kan şekeri verisi bulunamadı.")
+        return
+
+    tarih_list = [row[0].strftime("%d.%m.%Y") for row in data]
+    ortalama_list = [float(row[1]) for row in data]
+
+    win = tk.Toplevel()
+    win.title("Günlük Kan Şekeri Grafiği")
+    win.geometry("600x400")
+
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot(tarih_list, ortalama_list, marker='o', linestyle='-', color='blue')
+    ax.set_title("Günlük Ortalama Kan Şekeri Seviyesi")
+    ax.set_xlabel("Tarih")
+    ax.set_ylabel("Ortalama Seviye (mg/dL)")
+    ax.tick_params(axis='x', rotation=45)
+
+    canvas = FigureCanvasTkAgg(fig, master=win)
+    canvas.draw()
+    canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
+
+    tk.Button(win, text="Kapat", command=win.destroy).pack(pady=6)
+

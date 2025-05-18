@@ -648,3 +648,56 @@ class Database:
 
         for (d,) in dates:
             self.check_daily_blood_sugar_alerts_for_doctor(hasta_id, d)
+
+    def get_recommendation_progress(self, hasta_id: int):
+        """Hastanın uyguladığı diyet ve egzersizlerin oranını döner: (diyet_oran, egzersiz_oran)"""
+        # Diyet
+        total_diyet = self.fetch_one(
+            "SELECT COUNT(*) FROM diyet_takibi WHERE hasta_id = %s;", (hasta_id,)
+        )[0]
+        applied_diyet = self.fetch_one(
+            "SELECT COUNT(*) FROM diyet_takibi WHERE hasta_id = %s AND durum = TRUE;", (hasta_id,)
+        )[0]
+
+        # Egzersiz
+        total_egz = self.fetch_one(
+            "SELECT COUNT(*) FROM egzersiz_takibi WHERE hasta_id = %s;", (hasta_id,)
+        )[0]
+        applied_egz = self.fetch_one(
+            "SELECT COUNT(*) FROM egzersiz_takibi WHERE hasta_id = %s AND durum = TRUE;", (hasta_id,)
+        )[0]
+
+        # Yüzde hesapla
+        diyet_oran = round((applied_diyet / total_diyet) * 100, 1) if total_diyet > 0 else 0
+        egz_oran = round((applied_egz / total_egz) * 100, 1) if total_egz > 0 else 0
+
+        return diyet_oran, egz_oran
+
+    def get_insulin_averages_for_graph(self, hasta_id):
+        """
+        Hazır günlük ortalama kan şekeri seviyelerini insulin_onerileri tablosundan getirir.
+        """
+        return self.fetch_all("""
+            SELECT tarih, ortalama
+            FROM insulin_onerileri
+            WHERE hasta_id = %s
+            ORDER BY tarih;
+        """, (hasta_id,))
+
+    def get_diet_exercise_blood_sugar_graph_data(self, hasta_id: int):
+        return self.fetch_all("""
+            SELECT dt.tarih,
+                   dtr.ad AS diyet_adi,
+                   dt.durum AS diyet_uygulandi,
+                   et.durum AS egzersiz_uygulandi,
+                   io.ortalama
+            FROM diyet_takibi dt
+            JOIN diyet_turleri dtr ON dt.diyet_turu_id = dtr.id
+            LEFT JOIN egzersiz_takibi et
+                ON dt.hasta_id = et.hasta_id AND dt.tarih = et.tarih
+            LEFT JOIN insulin_onerileri io
+                ON dt.hasta_id = io.hasta_id AND dt.tarih = io.tarih
+            WHERE dt.hasta_id = %s
+            ORDER BY dt.tarih;
+        """, (hasta_id,))
+

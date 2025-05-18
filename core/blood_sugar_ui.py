@@ -38,6 +38,11 @@ def show(hasta_id: int) -> None:
     # --- İnsülin Önerileri ---
     tk.Label(win, text="İnsülin Önerileri", font=("Arial", 14)).pack(pady=10)
 
+    tk.Label(win, text="Tarihe göre filtrele (GG.AA.YYYY):").pack()
+    filter_entry = tk.Entry(win, width=20, justify="center")
+    filter_entry.pack(pady=4)
+
+
     dose_cols = ("Tarih", "Ortalama", "Doz (ml)")
     dose_tv = ttk.Treeview(win, columns=dose_cols, show="headings", height=6)
     for col, w in zip(dose_cols, (150, 150, 100)):
@@ -107,6 +112,29 @@ def show(hasta_id: int) -> None:
             alert_box.insert("end", f"{tarih} | {uyari_tipi}: {mesaj}\n")
 
     alert_box.config(state="disabled")
+
+    def filtrele_insulin():
+        tarih_str = filter_entry.get().strip()
+        try:
+            hedef_tarih = datetime.strptime(tarih_str, "%d.%m.%Y").date()
+        except ValueError:
+            messagebox.showerror("Hata", "Tarih biçimi GG.AA.YYYY olmalı.")
+            return
+
+        for i in dose_tv.get_children():
+            dose_tv.delete(i)
+
+        db = Database(); db.connect()
+        dose_rows = db.get_insulin_suggestions(hasta_id)
+        db.close()
+
+        for tarih, ort, doz in dose_rows:
+            if tarih == hedef_tarih:
+                doz_str = "Yetersiz" if doz == -1 else f"{doz} ml"
+                dose_tv.insert("", "end", values=(tarih.strftime("%d.%m.%Y"), f"{ort:.2f}", doz_str))
+
+
+    tk.Button(win, text="Filtrele", command=filtrele_insulin, bg="#007ACC", fg="white").pack(pady=4)
 
     win.mainloop()
 
