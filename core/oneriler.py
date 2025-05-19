@@ -2,133 +2,54 @@
 # ────────────────────────────────────────────────────────────────────────────────
 """
 Diyabet Takip Sistemi – Diyet & Egzersiz Öneri Motoru
-
-• Kan şekeri aralığı ve hastanın seçtiği belirtiler kombinasyonuna göre
-  uygun diyet ve egzersiz önerisini döndürür.
-• Kurallar PDF dokümanındaki tabloya bire bir uyacak şekilde tanımlanmıştır.
 """
 from __future__ import annotations
 
+import re, unicodedata
 from typing import Optional, Tuple, List, Set
 
+# ───────────────────────── Yardımcı ─────────────────────────
+def _normalize(txt: str) -> str:
+    """
+    • Unicode ayrıştır → NFKD
+    • Aksan işaretlerini (Mn) at
+    • Küçük harf + çoklu boşluk → tek boşluk
+    """
+    txt = unicodedata.normalize("NFKD", txt)
+    txt = "".join(ch for ch in txt if unicodedata.category(ch) != "Mn")
+    txt = txt.lower()
+    txt = re.sub(r"\s+", " ", txt).strip()
+    return txt
 
-# ──────────────── KURAL TABLOSU ────────────────
-# Her kural beş öğeden oluşur:
-#   (alt_sınır, üst_sınır, belirtiler_seti, diyet, egzersiz)
-# • alt_sınır / üst_sınır None ise: açık uçlu (örn. < 70 mg/dL veya ≥ 180 mg/dL)
-# • Belirtiler tam eşleşmeli (seçimler == kural) olacak şekilde kontrol ediliyor.
-_RULES: List[Tuple[Optional[float], Optional[float], Set[str], str, str]] = [
-    # < 70 mg/dL  – Hipoglisemi
-    (
-        None,
-        70,
-        {"nöropati", "polifaji", "yorgunluk"},
-        "Dengeli Beslenme",
-        "Yok",
-    ),
-    # 70 – 110 mg/dL – Normal (alt düzey)
-    (
-        70,
-        110,
-        {"yorgunluk", "kilo kaybı"},
-        "Az Şekerli Diyet",
-        "Yürüyüş",
-    ),
-    (
-        70,
-        110,
-        {"polifaji", "polidipsi"},
-        "Dengeli Beslenme",
-        "Yürüyüş",
-    ),
-    # 110 – 180 mg/dL – Normal (üst düzey) / Hafif yüksek
-    (
-        110,
-        180,
-        {"bulanık görme", "nöropati"},
-        "Az Şekerli Diyet",
-        "Klinik Egzersiz",
-    ),
-    (
-        110,
-        180,
-        {"poliüri", "polidipsi"},
-        "Şekersiz Diyet",
-        "Klinik Egzersiz",
-    ),
-    (
-        110,
-        180,
-        {"yorgunluk", "nöropati", "bulanık görme"},
-        "Az Şekerli Diyet",
-        "Yürüyüş",
-    ),
-    # ≥ 180 mg/dL – Hiperglisemi
-    (
-        180,
-        None,
-        {"yaraların yavaş iyileşmesi", "polifaji", "polidipsi"},
-        "Şekersiz Diyet",
-        "Klinik Egzersiz",
-    ),
-    (
-        180,
-        None,
-        {"yaraların yavaş iyileşmesi", "kilo kaybı"},
-        "Şekersiz Diyet",
-        "Yürüyüş",
-    ),
+# ───────────────────────── KURALLAR ─────────────────────────
+_RAW_RULES: List[Tuple[Optional[float], Optional[float], Set[str], str, str]] = [
+    (None, 70, {"Nöropati", "Polifaji", "Yorgunluk"},                      "Dengeli Beslenme", "Yok"),
+    (70, 110, {"Yorgunluk", "Kilo Kaybı"},                                "Az Şekerli Diyet", "Yürüyüş"),
+    (70, 110, {"Polifaji", "Polidipsi"},                                  "Dengeli Beslenme", "Yürüyüş"),
+    (110, 180, {"Bulanık Görme", "Nöropati"},                             "Az Şekerli Diyet", "Klinik Egzersiz"),
+    (110, 180, {"Poliüri", "Polidipsi"},                                  "Şekersiz Diyet",   "Klinik Egzersiz"),
+    (110, 180, {"Yorgunluk", "Nöropati", "Bulanık Görme"},                "Az Şekerli Diyet", "Yürüyüş"),
+    (180, None, {"Yaraların Yavaş İyileşmesi", "Polifaji", "Polidipsi"},   "Şekersiz Diyet",   "Klinik Egzersiz"),
+    (180, None, {"Yaraların Yavaş İyileşmesi", "Kilo Kaybı"},              "Şekersiz Diyet",   "Yürüyüş"),  # Özel kural
 ]
 
+# Kuralları ön-normalize et – tek seferlik
+_RULES = [
+    (lo, hi, {_normalize(b) for b in s}, diet, ex)
+    for lo, hi, s, diet, ex in _RAW_RULES
+]
 
-# ────────────────────────────────────────────────────────────────────────────────
-def _normalize(text: str) -> str:
-    """
-    Küçük-harf + baştaki/sondaki boşlukları kırp + Türkçe karakter duyarlı normalize.
-    Python'un .lower() metodu Unicode-uyumlu olduğu için ek işleme gerek yok.
-    """
-    return text.strip().lower()
+# ───────────────────────── Ana Fonksiyon ─────────────────────────
+def get_recommendations(ks: float, symptoms: List[str]) -> Optional[Tuple[str, str]]:
+    selected = {_normalize(sym) for sym in symptoms}
 
-
-def get_recommendations(
-    ks_value: float,
-    symptoms: List[str],
-) -> Optional[Tuple[str, str]]:
-    """
-    Parametreler
-    ------------
-    ks_value : float
-        Hastanın ölçtüğü kan şekeri (mg/dL).
-    symptoms : List[str]
-        Kullanıcının GUI’den seçtiği belirtiler.
-
-    Döndürür
-    --------
-    (diyet, egzersiz)  → Eşleşme bulunduysa
-    None               → Hiçbir kural tam olarak uyuşmadı
-    """
-    # Kullanıcının seçtiği belirtileri normalize et
-    selected: Set[str] = {_normalize(b) for b in symptoms}
-
-    # Her kuralı sırayla kontrol et
-    for low, high, rule_set, diet, exercise in _RULES:
-        # Kan şekeri aralığı
-        if low is not None and ks_value < low:
-            continue
-        if high is not None and ks_value > high:
-            continue
-
-        # Belirti kümesi tam eşleşmeli (ne eksik ne fazla)
-        if selected == rule_set:
-            return diet, exercise
-
-    # Uyumlu kural yok
+    for lo, hi, rule_set, diet, ex in _RULES:
+        if lo is not None and ks < lo:  continue
+        if hi is not None and ks > hi:  continue
+        if selected == rule_set:        return diet, ex
     return None
 
-
-# —————————————————— Modül testleri ——————————————————
+# ───────────────────────── Hızlı Test ─────────────────────────
 if __name__ == "__main__":
-    # 1) Pozitif test – Şekersiz Diyet, Klinik Egzersiz
-    print(get_recommendations(152, ["Poliüri", "Polidipsi"]))
-    # 2) Negatif test – Kurala bire bir uymadığı için None
-    print(get_recommendations(152, ["Poliüri", "Polidipsi", "Kilo Kaybı"]))
+    print(get_recommendations(190, ["Kilo  Kaybı", "Yaraların   Yavaş İyileşmesi"]))
+    # ('Şekersiz Diyet', 'Yürüyüş')
