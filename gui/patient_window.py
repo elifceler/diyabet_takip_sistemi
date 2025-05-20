@@ -7,6 +7,8 @@ from core.blood_sugar_ui import show   # ölçüm‑liste & insülin penceresi
 from gui.onerileri_uygula_window import open_pending_recommendations
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from gui.kisi_bilgisi_window import open_kisi_bilgisi_window
+
 
 
 # ------------------------------------------------------------------
@@ -161,6 +163,12 @@ def run_patient(info: dict) -> None:
         command=lambda: back_to_login(root)
     ).pack(pady=10)
 
+    tk.Button(
+        root,
+        text="Kişi Bilgisi",
+        command=lambda: open_kisi_bilgisi_window(info["id"]),
+        bg="#2196F3", fg="white"
+    ).pack(pady=6)
 
     root.mainloop()
 

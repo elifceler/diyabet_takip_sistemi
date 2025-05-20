@@ -14,6 +14,8 @@ from core.gecmis_oneriler_window import open_gecmis_oneriler_window
 from gui.patient_window import show_progress
 from core.graph_utils import show_combined_graph
 from core.tum_hasta_bilgileri_window import open_tum_hasta_bilgileri_window
+from gui.kisi_bilgisi_window import open_kisi_bilgisi_window
+from gui.profil_window import upload_profile_picture
 # ────────────────────────────────────────────────────────────────────────────────
 
 
@@ -293,6 +295,13 @@ def run_doctor(info: dict) -> None:
     tk.Button(root, text="Geri Dön",
               command=lambda: back_to_login(root),
               bg="black", fg="white").pack(pady=10)
+
+    tk.Button(btn_frame,
+              text="Kişi Bilgisi",
+              command=lambda: open_kisi_bilgisi_window(info["id"]),
+              bg="#9C27B0", fg="white",
+              **BTN
+              ).grid(row=6, column=0, columnspan=2, pady=(6, 0))
 
     root.mainloop()
 
