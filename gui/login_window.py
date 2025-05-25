@@ -5,14 +5,14 @@ from gui.doctor_window import run_doctor
 from gui.patient_window import run_patient
 
 def run_login(expected_role: str):
-    db = Database()                     # tek DB nesnesi; her giriş denemesinde bağlan-kapat
+    db = Database()
 
     def try_login():
         tc = entry_tc.get().strip()
         pw = entry_pw.get().strip()
 
         db.connect()
-        info = db.login_user(tc, pw)    # yeni login_user sözlük döndürüyor
+        info = db.login_user(tc, pw)
         db.close()
 
         if not info:
@@ -20,33 +20,45 @@ def run_login(expected_role: str):
             return
 
         if info["rol"] != expected_role:
-            messagebox.showerror("Hata",
-                                 f"Bu ekran yalnızca {expected_role} girişi içindir!")
+            messagebox.showerror("Hata", f"Bu ekran yalnızca {expected_role} girişi içindir!")
             return
 
-        # başarı → login penceresini kapat ve ilgili pencereye geç
         root.destroy()
         if info["rol"] == "doktor":
-            run_doctor(info)            # info sözlüğünü ilet
+            run_doctor(info)
         else:
             run_patient(info)
 
     # ---------- UI ----------
     root = tk.Tk()
     root.title(f"{expected_role.capitalize()} Girişi")
-    root.geometry("300x180")
+    root.geometry("360x260")
+    root.configure(bg="#f0f0f0")
 
     tk.Label(root, text=f"{expected_role.capitalize()} Girişi",
-             font=("Arial", 14)).pack(pady=10)
+             font=("Arial", 16, "bold"),
+             fg="#2E7D32", bg="#f0f0f0").pack(pady=(20, 5))
 
-    tk.Label(root, text="TC Kimlik No:").pack()
-    entry_tc = tk.Entry(root)
-    entry_tc.pack()
+    tk.Label(root, text="Lütfen aşağıdaki TC No ve şifre bilgilerini giriniz.",
+             font=("Arial", 10), bg="#f0f0f0", fg="#555555").pack()
 
-    tk.Label(root, text="Şifre:").pack(pady=5)
-    entry_pw = tk.Entry(root, show="*")
-    entry_pw.pack()
+    frm = tk.Frame(root, bg="#f0f0f0")
+    frm.pack(pady=12)
 
-    tk.Button(root, text="Giriş Yap", command=try_login).pack(pady=12)
+    # TC girişi
+    tk.Label(frm, text="TC Kimlik No:", font=("Arial", 11), bg="#f0f0f0").grid(row=0, column=0, sticky="e", padx=6, pady=6)
+    entry_tc = tk.Entry(frm, width=25)
+    entry_tc.grid(row=0, column=1, padx=6, pady=6)
+
+    # Şifre girişi
+    tk.Label(frm, text="Şifre:", font=("Arial", 11), bg="#f0f0f0").grid(row=1, column=0, sticky="e", padx=6, pady=6)
+    entry_pw = tk.Entry(frm, width=25, show="*")
+    entry_pw.grid(row=1, column=1, padx=6, pady=6)
+
+    # Giriş butonu
+    tk.Button(root, text="Giriş Yap",
+              font=("Arial", 11), width=20,
+              bg="#4CAF50", fg="white", activebackground="#45a049",
+              command=try_login).pack(pady=16)
 
     root.mainloop()

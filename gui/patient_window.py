@@ -165,7 +165,7 @@ def run_patient(info: dict) -> None:
 
     tk.Button(
         root,
-        text="Kişi Bilgisi",
+        text="Hasta Bilgisi",
         command=lambda: open_kisi_bilgisi_window(info["id"]),
         bg="#2196F3", fg="white"
     ).pack(pady=6)

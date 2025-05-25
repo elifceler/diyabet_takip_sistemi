@@ -54,44 +54,68 @@ def run_doctor(info: dict) -> None:
     root = tk.Tk()
     root.title("Doktor Paneli")
     root.geometry("880x780")
-    root.resizable(False, False)
+    root.resizable(True, True)
 
     # ------------------ BAŞLIK ------------------
-    tk.Label(root, text=f"Dr. {info['ad']} {info['soyad']}",
-             font=("Arial", 16, "bold")).pack(pady=10)
+    header_frame = tk.Frame(root, bg="#e0f7fa")
+    header_frame.pack(fill="x", pady=(0, 5))
+
+    tk.Label(header_frame, text=f"👨‍⚕️ Dr. {info['ad']} {info['soyad']}",
+             font=("Segoe UI", 18, "bold"), fg="#006064", bg="#e0f7fa").pack(pady=10)
 
     # ------------------ HASTA TABLOSU ------------------
-    columns = ("TC", "Ad Soyad", "E-posta", "Cinsiyet", "Doğum Tarihi")
-    tree = ttk.Treeview(root, columns=columns, show="headings", height=8)
+    style = ttk.Style()
+    style.configure("Treeview.Heading", font=("Segoe UI", 10, "bold"), background="#f2f2f2", foreground="#333")
+    style.configure("Treeview", font=("Segoe UI", 10), rowheight=30, background="white", foreground="#000")
+    style.map('Treeview', background=[('selected', '#bbdefb')], foreground=[('selected', 'black')])
 
-    for col, w in zip(columns, (110, 180, 190, 80, 110)):
+    tree_frame = tk.Frame(root, bg="white", bd=2, relief="groove")
+    tree_frame.pack(padx=15, pady=5, fill="x")
+
+    columns = ("TC", "Ad Soyad", "E-posta", "Cinsiyet", "Doğum Tarihi")
+    tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=6)
+
+    for col, w in zip(columns, (120, 180, 230, 90, 110)):
         tree.heading(col, text=col)
         tree.column(col, width=w, anchor="center")
-    tree.pack(padx=15, fill="x")
+
+    tree.pack(fill="x")
 
     load_patients(tree, info["id"])
 
     # ------------------ HASTA EKLEME FORMU ------------------
-    form = tk.Frame(root); form.pack(pady=12)
+    form = tk.Frame(root, bg="#e8f0fe", bd=2, relief="groove")
+    form.pack(pady=20)
+
     entries: dict[str, tk.Entry | ttk.Combobox] = {}
 
-    def add_entry(label: str, show: str = "", width: int = 24) -> None:
+    def add_entry(label: str, show: str = "", width: int = 28) -> None:
         row = len(entries)
-        tk.Label(form, text=label).grid(row=row, column=0, sticky="e", pady=2)
-        e = tk.Entry(form, width=width, show=show)
-        e.grid(row=row, column=1, padx=6)
+        # Etiket
+        tk.Label(form, text=label + ":", font=("Segoe UI", 10, "bold"),
+                 bg="#e8f0fe", anchor="e", width=24, fg="#333").grid(
+            row=row, column=0, sticky="e", pady=6, padx=(10, 4)
+        )
+        # Giriş kutusu
+        e = tk.Entry(form, width=width, show=show, relief="solid", bd=1,
+                     font=("Segoe UI", 10))
+        e.grid(row=row, column=1, padx=(4, 10), pady=6, ipady=2)
         entries[label] = e
 
+    # Giriş kutuları
     for lbl in ("TC", "Ad", "Soyad", "Şifre", "E-posta"):
         add_entry(lbl, show="*" if lbl == "Şifre" else "")
 
-    # Cinsiyet
+    # Cinsiyet (Combobox)
     row = len(entries)
-    tk.Label(form, text="Cinsiyet").grid(row=row, column=0, sticky="e", pady=2)
+    tk.Label(form, text="Cinsiyet:", font=("Segoe UI", 10, "bold"),
+             bg="#e8f0fe", anchor="e", width=20, fg="#333").grid(
+        row=row, column=0, sticky="e", pady=6, padx=(10, 4)
+    )
     gender_cb = ttk.Combobox(form, values=["Kadın", "Erkek", "Diğer"],
-                             width=22, state="readonly")
+                             width=26, state="readonly", font=("Segoe UI", 10))
     gender_cb.current(0)
-    gender_cb.grid(row=row, column=1, padx=6)
+    gender_cb.grid(row=row, column=1, padx=(4, 10), pady=6, ipady=1)
     entries["Cinsiyet"] = gender_cb
 
     # Doğum tarihi
@@ -254,54 +278,52 @@ def run_doctor(info: dict) -> None:
         show_combined_graph(int(sel[0]))
 
     # ------------------------------------------------------------------
-    # KOMUT BUTONLARI – 2 sütunlu, kompakt
+    # KOMUT BUTONLARI – responsive ve tam ekran destekli
     # ------------------------------------------------------------------
-    btn_frame = tk.Frame(root); btn_frame.pack(pady=6)
-    BTN = dict(width=12, pady=2)
+    btn_frame = tk.Frame(root, bg="#f0f4f8")
+    btn_frame.pack(pady=(12, 6), fill="x")
+
+    # 3 sütunu esnek yap
+    for i in range(3):
+        btn_frame.columnconfigure(i, weight=1)
+
+    BTN = dict(pady=6, height=1, font=("Arial", 10, "bold"))
 
     # Satır 0
-    tk.Button(btn_frame, text="Hasta Ekle", bg="#4CAF50", fg="white",
-              command=add_patient_ui, **BTN).grid(row=0, column=0, padx=4)
-    tk.Button(btn_frame, text="Hasta Sil",  bg="#F44336", fg="white",
-              command=delete_patient_ui, **BTN).grid(row=0, column=1, padx=4)
+    tk.Button(btn_frame, text="Hasta Ekle", bg="#27ae60", fg="white",
+              command=add_patient_ui, **BTN).grid(row=0, column=0, padx=6, sticky="ew")
+    tk.Button(btn_frame, text="Hasta Sil", bg="#c0392b", fg="white",
+              command=delete_patient_ui, **BTN).grid(row=0, column=1, padx=6, sticky="ew")
+    tk.Button(btn_frame, text="Doktor Bilgisi", bg="#9b59b6", fg="white",
+              command=lambda: open_kisi_bilgisi_window(info["id"]), **BTN).grid(row=0, column=2, padx=6, sticky="ew")
 
     # Satır 1
-    tk.Button(btn_frame, text="Kan Şekeri Verileri",
-              command=view_blood_sugar, **BTN).grid(row=1, column=0, padx=4)
-    tk.Button(btn_frame, text="Uyarıları Gör",
-              command=view_alerts, **BTN).grid(row=1, column=1, padx=4)
+    tk.Button(btn_frame, text="Kan Şekeri Verileri", bg="#2980b9", fg="white",
+              command=view_blood_sugar, **BTN).grid(row=1, column=0, padx=6, sticky="ew")
+    tk.Button(btn_frame, text="Uyarıları Gör", bg="#f39c12", fg="white",
+              command=view_alerts, **BTN).grid(row=1, column=1, padx=6, sticky="ew")
+    tk.Button(btn_frame, text="Geçmiş Öneriler", bg="#8e44ad", fg="white",
+              command=view_past_recommendations, **BTN).grid(row=1, column=2, padx=6, sticky="ew")
 
     # Satır 2
-    tk.Button(btn_frame, text="Öneri Al", bg="#2196F3", fg="white",
-              command=open_recommendation, **BTN).grid(row=2, column=0, padx=4)
-    tk.Button(btn_frame, text="Geçmiş Öneriler",
-              command=view_past_recommendations, **BTN).grid(row=2, column=1, padx=4)
+    tk.Button(btn_frame, text="Öneri Al", bg="#16a085", fg="white",
+              command=open_recommendation, **BTN).grid(row=2, column=0, padx=6, sticky="ew")
+    tk.Button(btn_frame, text="Öneri Uygulama", bg="#d35400", fg="white",
+              command=view_progress_for_selected_patient, **BTN).grid(row=2, column=1, padx=6, sticky="ew")
+    tk.Button(btn_frame, text="Kan Şekeri İlişki", bg="#3498db", fg="white",
+              command=view_relationship_graph, **BTN).grid(row=2, column=2, padx=6, sticky="ew")
 
-    # Satır 3 – tek buton
-    tk.Button(btn_frame, text="Tüm Hasta Bilgileri", bg="#673AB7", fg="white",
-              command=open_all_patients, **BTN).grid(row=3, column=0, columnspan=2, pady=(4,2))
+    # En alttaki satır için sütun yapılandırması (eşit genişlik)
+    btn_frame.columnconfigure(0, weight=1)
+    btn_frame.columnconfigure(1, weight=1)
 
-    # Satır 4
-    tk.Button(btn_frame, text="Öneri Uygulama", bg="#FFC107",
-              command=view_progress_for_selected_patient, **BTN).grid(row=4, column=0, padx=4)
-    tk.Button(btn_frame, text="Uygulama Grafiği", bg="#8E44AD", fg="white",
-              command=view_adherence_graph, **BTN).grid(row=4, column=1, padx=4)
+    # Satır 3 – iki buton eşit genişlikte
+    tk.Button(btn_frame, text="Tüm Hasta Bilgileri", bg="#34495e", fg="white",
+              command=open_all_patients, **BTN).grid(row=3, column=0, padx=6, pady=(10, 0), sticky="ew")
 
-    # Satır 5 – tek buton
-    tk.Button(btn_frame, text="Kan Şekeri İlişki", bg="#03A9F4", fg="white",
-              command=view_relationship_graph, **BTN).grid(row=5, column=0, columnspan=2, pady=(4,0))
-
-    # ------------------ GERİ DÖN ------------------
-    tk.Button(root, text="Geri Dön",
-              command=lambda: back_to_login(root),
-              bg="black", fg="white").pack(pady=10)
-
-    tk.Button(btn_frame,
-              text="Kişi Bilgisi",
-              command=lambda: open_kisi_bilgisi_window(info["id"]),
-              bg="#9C27B0", fg="white",
-              **BTN
-              ).grid(row=6, column=0, columnspan=2, pady=(6, 0))
+    tk.Button(btn_frame, text="← Geri Dön", bg="black", fg="white",
+              font=("Arial", 10, "bold"), command=lambda: back_to_login(root)).grid(
+        row=3, column=1, padx=6, pady=(10, 0), sticky="ew")
 
     root.mainloop()
 

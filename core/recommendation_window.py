@@ -28,24 +28,33 @@ def open_recommendation_window(hasta_id: int) -> None:  # noqa: C901
     # ——— Pencere ——————————————————————————————————————————
     win = tk.Toplevel()
     win.title("Diyet ve Egzersiz Önerisi")
-    win.geometry("420x650")
+    win.configure(bg="#f7f9fc")  # açık mavi-gri arka plan
+    win.geometry("460x650")
     win.resizable(False, False)
 
     # ----- Kan şekeri girişi ----------------------------------------------------
-    tk.Label(win, text="Kan Şekeri (mg/dL)", font=("Arial", 12, "bold")
-             ).pack(pady=(14, 4))
-    ent_sugar = tk.Entry(win, width=12, justify="center"); ent_sugar.pack()
+    tk.Label(win, text="Kan Şekeri (mg/dL)", font=("Segoe UI", 12, "bold"),
+             fg="#2c3e50", bg="#f7f9fc").pack(pady=(20, 4))
+
+    ent_sugar = tk.Entry(win, justify="center", font=("Segoe UI", 11),
+                         width=20, relief="solid", bd=1)
+    ent_sugar.pack(ipady=4)
 
     # ----- Tarih girişi ---------------------------------------------------------
-    tk.Label(win, text="Tarih (GG.AA.YYYY)", font=("Arial", 12, "bold")
-             ).pack(pady=(18, 4))
-    ent_date = tk.Entry(win, width=20, justify="center")
-    ent_date.insert(0, datetime.now().strftime("%d.%m.%Y")); ent_date.pack()
+    tk.Label(win, text="Tarih (GG.AA.YYYY)", font=("Segoe UI", 12, "bold"),
+             fg="#2c3e50", bg="#f7f9fc").pack(pady=(20, 4))
+
+    ent_date = tk.Entry(win, justify="center", font=("Segoe UI", 11),
+                        width=20, relief="solid", bd=1)
+    ent_date.insert(0, datetime.now().strftime("%d.%m.%Y"))
+    ent_date.pack(ipady=4)
 
     # ----- Belirtiler -----------------------------------------------------------
-    tk.Label(win, text="Belirtiler", font=("Arial", 12, "bold")
-             ).pack(pady=(18, 6))
-    frame_chk = tk.Frame(win, height=220)
+    tk.Label(win, text="Belirtiler", font=("Segoe UI", 13, "bold"),
+             fg="#2c3e50", bg="#f7f9fc").pack(pady=(25, 8))
+
+    frame_chk = tk.Frame(win, bg="#f7f9fc")
+
     frame_chk.pack(fill="both", expand=True, padx=10)
     frame_chk.pack_propagate(False)
 
@@ -65,10 +74,9 @@ def open_recommendation_window(hasta_id: int) -> None:  # noqa: C901
         for idx, row in enumerate(rows):
             bid, ad = (row["id"], row["ad"]) if isinstance(row, dict) else row
             var = tk.BooleanVar(value=False)
-            tk.Checkbutton(frame_chk, text=ad, anchor="w",
-                           variable=var
-                           ).grid(row=idx // 2, column=idx % 2,
-                                  sticky="w", padx=4, pady=2)
+            tk.Checkbutton(frame_chk, text=ad, variable=var,
+                           font=("Segoe UI", 10), bg="#f7f9fc", anchor="w"
+                           ).grid(row=idx // 3, column=idx % 3, sticky="w", padx=8, pady=6)
             symptom_vars[bid] = (ad, var)
 
     # ---------------------------------------------------------------------------
@@ -164,5 +172,8 @@ def open_recommendation_window(hasta_id: int) -> None:  # noqa: C901
     # — Kaydet düğmesi
     tk.Button(win, text="Öneriyi Hesapla ve Kaydet",
               command=handle_recommend,
-              bg="#4CAF50", fg="white",
-              padx=12, pady=4).pack(pady=24)
+              font=("Segoe UI", 10, "bold"),
+              bg="#27ae60", fg="white", activebackground="#2ecc71",
+              width=28, height=2, relief="raised", bd=2
+              ).pack(pady=28)
+
