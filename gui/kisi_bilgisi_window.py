@@ -7,8 +7,11 @@ from gui.profil_window import upload_profile_picture
 def open_kisi_bilgisi_window(user_id: int):
     win = tk.Toplevel()
     win.title("Kişi Bilgileri")
-    win.geometry("350x450")
+    win.configure(bg="#F8F9FA")
     win.resizable(False, False)
+
+    outer = tk.Frame(win, bg="#F8F9FA")
+    outer.pack(expand=True)
 
     db = Database(); db.connect()
     row = db.fetch_one("""
@@ -18,25 +21,27 @@ def open_kisi_bilgisi_window(user_id: int):
     db.close()
 
     if not row:
-        tk.Label(win, text="Kullanıcı bilgisi bulunamadı!", fg="red").pack(pady=20)
+        tk.Label(outer, text="Kullanıcı bilgisi bulunamadı!", fg="red", bg="#F8F9FA", font=("Segoe UI", 10)).pack(pady=20)
         return
 
     ad, soyad, tc, dogum, email, img_path = row
 
-    # Profil fotoğrafı
-    img_label = tk.Label(win)
-    img_label.pack(pady=10)
+    # Profil resmi
+    img_label = tk.Label(outer, bg="#F8F9FA")
+    img_label.pack(pady=(30, 10))
 
     if img_path and os.path.exists(img_path):
         img = Image.open(img_path)
-        img = img.resize((120, 120))
+        img = img.resize((140, 140))
         photo = ImageTk.PhotoImage(img)
         img_label.config(image=photo)
         img_label.image = photo
+    else:
+        img_label.config(text="Profil fotoğrafı yok", fg="gray", font=("Segoe UI", 9, "italic"))
 
-    # Kullanıcı bilgileri
-    info_frame = tk.Frame(win)
-    info_frame.pack(pady=10)
+    # Kart görünümünde bilgileri tut
+    card = tk.Frame(outer, bg="white", bd=1, relief="solid")
+    card.pack(padx=20, pady=10, ipadx=20, ipady=20)
 
     entries = [
         ("Ad Soyad", f"{ad} {soyad}"),
@@ -46,13 +51,18 @@ def open_kisi_bilgisi_window(user_id: int):
     ]
 
     for label_text, value in entries:
-        tk.Label(info_frame, text=label_text + ":", font=("Arial", 10, "bold")).pack(anchor="w")
-        tk.Label(info_frame, text=value).pack(anchor="w", pady=(0, 6))
+        tk.Label(card, text=label_text + ":", font=("Segoe UI", 10, "bold"), bg="white", anchor="w").pack(fill="x", padx=10, pady=(4, 0))
+        tk.Label(card, text=value, font=("Segoe UI", 10), bg="white", anchor="w", wraplength=300).pack(fill="x", padx=10, pady=(0, 6))
 
-    # 🔵 Buton doğru yerde, sadece bir kez
+    # Profil fotoğrafı yükle butonu
     tk.Button(
-        win,
+        outer,
         text="Profil Fotoğrafı Yükle",
         command=lambda: upload_profile_picture(user_id, img_label),
-        bg="#2196F3", fg="white"
-    ).pack(pady=10)
+        bg="#2196F3", fg="white",
+        font=("Segoe UI", 10, "bold"),
+        activebackground="#1976D2",
+        relief="flat",
+        padx=12, pady=6
+    ).pack(pady=20)
+
