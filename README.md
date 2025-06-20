@@ -28,3 +28,30 @@ Bu proje, diyabet hastalarının günlük kan şekeri ölçümlerini, diyet ve e
    ```bash
    git clone https://github.com/kullanici/diyabet_takip_sistemi.git
    cd diyabet_takip_sistemi
+
+Sanal ortam oluşturun ve bağımlılıkları yükleyin:
+
+bash
+Kopyala
+Düzenle
+python -m venv venv
+venv\Scripts\activate   # (Linux/macOS için: source venv/bin/activate)
+pip install -r requirements.txt
+Veritabanını kurun:
+
+schema.sql dosyasını çalıştırarak PostgreSQL üzerinde tabloları oluşturun.
+
+Uygulamayı başlatın:
+
+bash
+Kopyala
+Düzenle
+python main.py
+📁 Proje Yapısı
+core/ → İş mantığı (veritabanı, öneri motoru, e-posta, grafikler)
+
+gui/ → Arayüz pencereleri
+
+schema.sql → Veritabanı tablo tanımları
+
+main.py → Uygulamanın giriş noktası
